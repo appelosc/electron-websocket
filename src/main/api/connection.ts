@@ -35,7 +35,10 @@ socket.on('connect_error', async (err) => {
     logout()
     return
   }
-  if (err.message !== 'TokenExpiredError') return
+  if (err.message !== 'TokenExpiredError') {
+    setStatus(socket.active ? 'yellow' : 'red')
+    return
+  }
   try {
     setStatus('yellow')
     await refreshToken()
@@ -45,15 +48,16 @@ socket.on('connect_error', async (err) => {
   }
   setStatus(socket.active ? 'yellow' : 'red')
 })
-
+// Tar hand om statusen i main nu iställer för i frontenden.
 socket.io.on('reconnect_attempt', () => setStatus('yellow'))
 socket.io.on('reconnect_failed', () => setStatus('red'))
+//skickar till alla öppna windows som vi har via channeln message med text som payload.
 socket.on('message', (text: string) =>
   BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('socket:message', text))
 )
 
 export function connectSocket() {
-  if (socket.active) return
+  if (socket.connected) return
   setStatus('yellow')
   socket.connect()
 }

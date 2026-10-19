@@ -50,7 +50,7 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
+  // registerar alla ipc handlers
   registerIpc()
   createWindow()
 

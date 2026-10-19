@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { logout } from '../api/logout'
-import type { Status } from '../types/status.ts'
+import { logout } from '../api/auth'
 import '../styling/PasteBin.css'
 
 function PasteBin() {
@@ -13,9 +12,11 @@ function PasteBin() {
   const [status, setStatus] = useState<Status>('yellow')
 
   useEffect(() => {
+    // all statushantering sker i backenden, subscribar till lyssnarna här 
+    
     window.socket.getStatus().then(setStatus)
     window.socket.connectSocket()
-
+    // sparar unsubsribe i consts så vi kan unsubscriba till lyssnarna och de inte blir och spöka
     const unsubscribeStatus = window.socket.onStatus((s) => setStatus(s))
     const unsubscribeMessage = window.socket.onMessage((text) => setReceived(text))
 

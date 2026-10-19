@@ -7,7 +7,7 @@ import { hasToken } from './api/refresh'
 import { connectSocket } from './api/connection'
 import { getStatus } from './api/connection'
 import { emitMessage } from './api/connection'
-
+// alla ipc handlers vi vill koppla till renderer
 export function registerIpc() {
   ipcMain.handle('user:login', (_e, username, password) => loginUser({ username, password }))
   ipcMain.handle('user:logout', () => logout())

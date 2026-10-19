@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const file = (): string => path.join(app.getPath('userData'), 'tokens.json')
+// istället för localstorage, skapar token.json och skriver/läser/deletar tokens med key value pair
 
 function readAll(): Record<string, string> {
   try {

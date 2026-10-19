@@ -1,9 +1,7 @@
 import { useState } from 'react'
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router'
-import { loginUser } from '../api/login'
-import { refreshUser } from '../api/refresh'
-import { clearSession } from '../api/session'
+import { loginUser, refreshUser, clearSession, hasToken } from '../api/auth'
 import '../styling/Login.css'
 
 function Login() {
@@ -16,8 +14,7 @@ function Login() {
 
   useEffect(() => {
     const tryRefresh = async () => {
-      const hasToken = window.api.hasToken()
-      if (!hasToken) {
+      if (!(await hasToken())) {
         setChecking(false)
         return
       }

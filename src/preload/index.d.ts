@@ -1,8 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-
-type Status = 'green' | 'yellow' | 'red'
-
+// typ declaration for ts så ts vet att de finns och vad för typ de returnerar.
 declare global {
+  type Status = 'green' | 'yellow' | 'red'
   interface Window {
     electron: ElectronAPI
     api: {
