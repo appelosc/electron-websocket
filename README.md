@@ -128,15 +128,3 @@ npm run format      # Prettier
 ```
 
 On Linux a keyring (for example GNOME Keyring or KWallet) must be available for `safeStorage` to be able to encrypt tokens.
-
-## AI usage
-
-Just as in project 1, I used AI as a research partner: to explain concepts, explain syntax and code, give examples and in some cases generate pseudocode when I got stuck. I only used the agentic coding tool Claude Code (Opus 5.5) to generate JSX, CSS and other boilerplate code. The logic and the TS files are code I took part in writing myself, in some cases with help from AI as mentioned at the start of this paragraph. AI was also used to support bug fixes. I understand the code I submitted.
-
-## Reflection
-
-Overall I thought this project was definitely more demanding than project 1. The WebSocket server was fairly easy because you only had to define an emit. The authentication there was a bit fiddly, but socket.io had good and readable documentation.
-
-The browser client was also fairly easy at first, especially before it needed a refresh token. When I added the refresh token it got harder. The API part of the refresh token was not that difficult, but it was hard to think through the workflow and how to tie everything together on the frontend. When I then started adding more socket listeners to control the `connection status` on the frontend it got quite messy, but I solved it.
-
-The hardest part for me in both project 1 and 2 was porting to Electron. When logic had to move to main, I had a very hard time visualizing the flow of information, especially for the socket part. What should go to main and what preload should look like was quite difficult. The hardest thing was, for example, calling socket.connect in main and then making the renderer understand that socket.connect had been called. That was easy when everything was in the frontend and you automatically knew whether it had been called or not. The same idea applies when the frontend wants main to run socket.connect: you have to send a signal to main, and then a signal back to the renderer that socket.connect has run. The logic behind this was very hard to visualize, and it is by far what I spent the most time on.
