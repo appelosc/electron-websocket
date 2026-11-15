@@ -1,110 +1,112 @@
-# electron-websocket
+# Clipboard Sync App – Electron desktop client
 
-En desktop-app byggd med Electron, React och TypeScript. Användaren loggar in och kommer sedan till en "pastebin" där allt man skriver skickas live via WebSocket (socket.io) till alla andra anslutna skärmar.
+A desktop app built with Electron, React and TypeScript. The user logs in and then reaches a "pastebin" where everything typed is sent live over WebSocket (socket.io) to all other connected screens.
 
-Appen är en port av en tidigare webb-frontend till Electron. All kommunikation med servrarna (inloggning, tokens och socket) har flyttats från frontenden till Electrons main-process.
+The app is a port of an earlier web frontend ([websocket-frontend](https://github.com/appelosc/websocket-frontend)) to Electron. All communication with the servers (login, tokens and socket) has been moved from the frontend to Electron's main process.
 
-## Funktioner
+Related repos: [authn-authz](https://github.com/appelosc/authn-authz) (`project2` branch, authentication API) and [websocket](https://github.com/appelosc/websocket) (WebSocket server).
 
-- Inloggning mot ett separat auth-API med access token och refresh token
-- Automatisk inloggning vid start om en giltig refresh token finns sparad
-- Tokens sparas krypterat på disk med Electrons `safeStorage`
-- Live-delning av text via socket.io
-- Statuslampa för anslutningen (grön = ansluten, gul = ansluter, röd = inte ansluten) och en "Reconnect"-knapp
-- Automatisk förnyelse av access token när den har gått ut
-- Automatisk utloggning om token är ogiltig eller inte kan förnyas
+## Features
 
-## Arkitektur
+- Login against a separate auth API with an access token and a refresh token
+- Automatic login on start if a valid refresh token is stored
+- Tokens are stored encrypted on disk with Electron's `safeStorage`
+- Live text sharing over socket.io
+- Connection status light (green = connected, yellow = connecting, red = not connected) and a "Reconnect" button
+- Automatic renewal of the access token when it has expired
+- Automatic logout if the token is invalid or cannot be renewed
 
-Electron-appen är uppdelad i tre delar:
+## Architecture
 
-| Del | Mapp | Ansvar |
+The Electron app is split into three parts:
+
+| Part | Folder | Responsibility |
 | --- | --- | --- |
-| Main | `src/main` | Node-processen. Pratar med auth-API:t, hanterar socket-anslutningen och sparar tokens. |
-| Preload | `src/preload` | Bryggan mellan main och renderer. Exponerar `window.api` och `window.socket` via `contextBridge`. |
-| Renderer | `src/renderer` | React-gränssnittet (Login- och PasteBin-sidorna). Har ingen direkt nätverkskontakt. |
+| Main | `src/main` | The Node process. Talks to the auth API, handles the socket connection and stores tokens. |
+| Preload | `src/preload` | The bridge between main and renderer. Exposes `window.api` and `window.socket` through `contextBridge`. |
+| Renderer | `src/renderer` | The React interface (the Login and PasteBin pages). Has no direct network access. |
 
-Renderern anropar funktioner på `window.api` / `window.socket`. Preload skickar vidare dem som IPC-meddelanden till main, och main skickar tillbaka händelser (status, meddelanden, utloggning) till alla fönster.
+The renderer calls functions on `window.api` / `window.socket`. Preload forwards them as IPC messages to main, and main sends events (status, messages, logout) back to all windows.
 
 ```
-Renderer (React)  ──window.api / window.socket──▶  Preload  ──IPC──▶  Main  ──HTTP / socket.io──▶  Servrar
+Renderer (React)  ──window.api / window.socket──▶  Preload  ──IPC──▶  Main  ──HTTP / socket.io──▶  Servers
                   ◀──────── onStatus / onMessage / onLoggedOut ───────────────
 ```
 
-### IPC-kanaler
+### IPC channels
 
-| Kanal | Typ | Beskrivning |
+| Channel | Type | Description |
 | --- | --- | --- |
-| `user:login` | invoke | Loggar in och sparar token + refresh token |
-| `user:logout` | invoke | Kopplar ner socketen, rensar tokens och meddelar renderern |
-| `user:refresh` | invoke | Hämtar en ny access token med refresh token |
-| `user:session` | invoke | Rensar sparade tokens |
-| `user:hastoken` | invoke | Kollar om en refresh token finns sparad |
-| `user:logged-out` | main → renderer | Skickas när användaren loggats ut, renderern går till `/login` |
-| `socket:connect` | invoke | Startar socket-anslutningen |
-| `socket:getStatus` | invoke | Returnerar nuvarande status (`green`, `yellow` eller `red`) |
-| `socket:emit` | send | Skickar text till servern |
-| `socket:status` | main → renderer | Ny anslutningsstatus |
-| `socket:message` | main → renderer | Text som tagits emot från servern |
+| `user:login` | invoke | Logs in and stores the token and refresh token |
+| `user:logout` | invoke | Disconnects the socket, clears the tokens and notifies the renderer |
+| `user:refresh` | invoke | Fetches a new access token with the refresh token |
+| `user:session` | invoke | Clears stored tokens |
+| `user:hastoken` | invoke | Checks whether a refresh token is stored |
+| `user:logged-out` | main → renderer | Sent when the user has been logged out; the renderer goes to `/login` |
+| `socket:connect` | invoke | Starts the socket connection |
+| `socket:getStatus` | invoke | Returns the current status (`green`, `yellow` or `red`) |
+| `socket:emit` | send | Sends text to the server |
+| `socket:status` | main → renderer | New connection status |
+| `socket:message` | main → renderer | Text received from the server |
 
-### Inloggning och tokens
+### Login and tokens
 
-1. Vid start kollar Login-sidan om en refresh token finns. Finns den försöker appen förnya access token och går direkt till pastebin-sidan.
-2. Annars loggar användaren in. Servern svarar med en access token och en refresh token som sparas krypterat i `tokens.json` i appens `userData`-mapp.
-3. Socketen skickar med access token vid anslutning. Om servern svarar `TokenExpiredError` förnyas token och socketen ansluter igen. Flera samtidiga förnyelser delar på samma anrop.
-4. Om token är ogiltig, saknas eller inte går att förnya loggas användaren ut automatiskt.
+1. On start, the Login page checks whether a refresh token exists. If it does, the app tries to renew the access token and goes straight to the pastebin page.
+2. Otherwise the user logs in. The server responds with an access token and a refresh token, which are stored encrypted in `tokens.json` in the app's `userData` folder.
+3. The socket sends the access token when connecting. If the server answers `TokenExpiredError`, the token is renewed and the socket connects again. Several simultaneous renewals share the same request.
+4. If the token is invalid, missing or cannot be renewed, the user is logged out automatically.
 
-### Servrar
+### Servers
 
-- Auth-API: `https://authn-authz-k1j2.onrender.com`
-- WebSocket-server: `https://websocket-2keq.onrender.com/`
+- Auth API: `https://authn-authz-k1j2.onrender.com`
+- WebSocket server: `https://websocket-2keq.onrender.com/`
 
-Servrarna ligger på Render och kan ta en stund att vakna om de inte använts på ett tag.
+The servers are hosted on Render and can take a while to wake up if they have not been used for some time.
 
-## Projektstruktur
+## Project structure
 
 ```
 src/
 ├── main/
-│   ├── index.ts           # Skapar fönstret och registrerar IPC
-│   ├── ipc.ts             # Alla IPC-handlers
+│   ├── index.ts           # Creates the window and registers IPC
+│   ├── ipc.ts             # All IPC handlers
 │   ├── api/
-│   │   ├── client.ts      # fetch-wrapper som lägger till Authorization-header
-│   │   ├── login.ts       # Inloggning
-│   │   ├── logout.ts      # Utloggning mot servern
-│   │   ├── refresh.ts     # Förnyelse av token
-│   │   ├── session.ts     # Rensar session och loggar ut lokalt
-│   │   └── connection.ts  # socket.io-anslutning och status
+│   │   ├── client.ts      # fetch wrapper that adds the Authorization header
+│   │   ├── login.ts       # Login
+│   │   ├── logout.ts      # Logout against the server
+│   │   ├── refresh.ts     # Token renewal
+│   │   ├── session.ts     # Clears the session and logs out locally
+│   │   └── connection.ts  # socket.io connection and status
 │   └── storage/
-│       └── token.ts       # Krypterad lagring av tokens
+│       └── token.ts       # Encrypted token storage
 ├── preload/
-│   ├── index.ts           # Exponerar window.api och window.socket
-│   └── index.d.ts         # Typer för window.api och window.socket
+│   ├── index.ts           # Exposes window.api and window.socket
+│   └── index.d.ts         # Types for window.api and window.socket
 └── renderer/
     └── src/
-        ├── App.tsx        # Routing och lyssnare för utloggning
-        ├── api/auth.ts    # Wrappers runt window.api
+        ├── App.tsx        # Routing and logout listener
+        ├── api/auth.ts    # Wrappers around window.api
         ├── pages/
         │   ├── Login.tsx
         │   └── PasteBin.tsx
         └── styling/
 ```
 
-## Kom igång
+## Getting started
 
-### Installera
+### Install
 
 ```bash
 npm install
 ```
 
-### Utveckling
+### Development
 
 ```bash
 npm run dev
 ```
 
-### Bygga
+### Build
 
 ```bash
 # Windows
@@ -117,24 +119,24 @@ npm run build:mac
 npm run build:linux
 ```
 
-### Övriga kommandon
+### Other commands
 
 ```bash
-npm run typecheck   # Typkontroll av main, preload och renderer
+npm run typecheck   # Type check of main, preload and renderer
 npm run lint        # ESLint
 npm run format      # Prettier
 ```
 
-På Linux behöver en nyckelring (t.ex. GNOME Keyring eller KWallet) finnas för att `safeStorage` ska kunna kryptera tokens.
+On Linux a keyring (for example GNOME Keyring or KWallet) must be available for `safeStorage` to be able to encrypt tokens.
 
-## AI-användning
+## AI usage
 
-Precis som i projekt 1 har jag använt AI som researchpartner för att be AI förklara koncept, förklara syntax + kod, ge exempel samt i vissa fall generera pseudokod när jag har kört fast. Jag har endast använt det agentiska kodningsverktyget Claude Code (Opus 5.5) för att generera JSX, CSS samt annan "boilerplate-kod". Logiken samt TS-filerna är kod jag själv varit med och skrivit, i vissa fall med hjälp av AI som jag nämnde i början av paragrafen. AI har även använts för att stöda vid buggfixar. Jag förstår den kod jag lämnat in.
+Just as in project 1, I used AI as a research partner: to explain concepts, explain syntax and code, give examples and in some cases generate pseudocode when I got stuck. I only used the agentic coding tool Claude Code (Opus 5.5) to generate JSX, CSS and other boilerplate code. The logic and the TS files are code I took part in writing myself, in some cases with help from AI as mentioned at the start of this paragraph. AI was also used to support bug fixes. I understand the code I submitted.
 
-## Reflektion
+## Reflection
 
-Överlag tyckte jag att detta projekt definitivt var mer krävande än projekt 1. WebSocket-servern var ganska lätt eftersom man endast behövde definiera en emit. Autentiseringen där var lite strulig, men socket.io hade ganska bra och lättläst dokumentation.
+Overall I thought this project was definitely more demanding than project 1. The WebSocket server was fairly easy because you only had to define an emit. The authentication there was a bit fiddly, but socket.io had good and readable documentation.
 
-Browserklienten var i början också ganska lätt, speciellt utan att behöva ha refresh token ännu. Men sedan när jag la till refresh token blev det lite jobbigt. API-delen av refresh token var inte så svår, men det blev svårt att tänka ut arbetsflödet och hur man skulle knyta samman allt på frontenden. Sedan när jag började lägga till fler lyssnare för sockets för att styra `connection status` på frontenden blev det ganska rörigt, men jag löste det.
+The browser client was also fairly easy at first, especially before it needed a refresh token. When I added the refresh token it got harder. The API part of the refresh token was not that difficult, but it was hard to think through the workflow and how to tie everything together on the frontend. When I then started adding more socket listeners to control the `connection status` on the frontend it got quite messy, but I solved it.
 
-Det absolut svåraste för mig i både projekt 1 och 2 var nog att porta till Electron. När man måste flytta logik till main hade jag väldigt svårt att visualisera flödet av information, speciellt när det kom till socket-delen. Vad som skulle till main och hur preload skulle se ut var ganska svårt. Svårast var nog att man t.ex. skulle anropa socket.connect i main, men sedan få renderern att förstå att man hade anropat socket.connect. Det var lätt när man hade allt i frontenden och automatiskt fick reda på om man hade anropat den eller inte. Samma idé gäller när man på frontenden vill att main ska köra socket.connect: då måste man skicka en signal till main, och sedan en signal tillbaka till renderern om att socket.connect hade körts. Logiken bakom detta var mycket svår att visualisera och jag spenderade överlägset mest tid på det.
+The hardest part for me in both project 1 and 2 was porting to Electron. When logic had to move to main, I had a very hard time visualizing the flow of information, especially for the socket part. What should go to main and what preload should look like was quite difficult. The hardest thing was, for example, calling socket.connect in main and then making the renderer understand that socket.connect had been called. That was easy when everything was in the frontend and you automatically knew whether it had been called or not. The same idea applies when the frontend wants main to run socket.connect: you have to send a signal to main, and then a signal back to the renderer that socket.connect has run. The logic behind this was very hard to visualize, and it is by far what I spent the most time on.
